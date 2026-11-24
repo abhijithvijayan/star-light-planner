@@ -64,7 +64,7 @@ function wrapPoint(pt,pitch,frontLR=true){
   const loops=[];
   for(let k=0;k<=n;k++){ const t=Math.min(1,k*pitch/pt.edge); if(t>=0.999) break; const ring=pt.base.map(bv=>lerp(bv,pt.tip,t)); loops.push(frontLR?ring:[ring[0],ring[3],ring[2],ring[1]]); }
   const path=helixFromLoops(loops); path.push(pt.tip);
-  return {path, loops:loops.length, length:polyLen(path)};
+  return {path, starts:loops.map((_,k)=>k*4), loops:loops.length, length:polyLen(path)};
 }
 // x-extent of the inner pentagon at height y
 function pentWidth(P2,y){
@@ -78,7 +78,7 @@ function wrapCenter(S,pitch,frontLR=true){
   for(let y=y0+pitch/2;y<y1;y+=pitch){ const w=pentWidth(S.P2,y); if(!w) continue;
     loops.push(frontLR?[[w[0],y,h],[w[1],y,h],[w[1],y,-h],[w[0],y,-h]]:[[w[0],y,h],[w[0],y,-h],[w[1],y,-h],[w[1],y,h]]); }
   const path=helixFromLoops(loops);
-  return {path, loops:loops.length, length:polyLen(path), height:y1-y0};
+  return {path, starts:loops.map((_,k)=>k*4), loops:loops.length, length:polyLen(path), height:y1-y0};
 }
 // Method B: horizontal slices of the whole body; taut loop = convex hull of the slice.
 function hull2(pts){
@@ -135,17 +135,28 @@ function sliceComponents(S,y,skip=[]){
     if(last && p.x0<=last.x1+1e-6){ last.pts.push(...p.pts); last.x1=Math.max(last.x1,p.x1); } else comps.push({...p, pts:[...p.pts]}); }
   return comps.map(c=>hull2(c.pts)).filter(h=>h.length>=2);
 }
-function ringFromHull(H,y,res,frontLR=true){
-  const ring=[...H,H[0]], per=[0]; for(let i=1;i<ring.length;i++) per.push(per[i-1]+Math.hypot(ring[i][0]-ring[i-1][0],ring[i][1]-ring[i-1][1]));
-  const tot=per[per.length-1];
-  let s0=0; for(let i=1;i<H.length;i++) if(H[i][0]<H[s0][0]) s0=i;
-  const off=per[s0], pts=[];
-  for(let k=0;k<res;k++){ const d=(off+tot*k/res)%tot; let i=1; while(i<per.length-1&&per[i]<d) i++;
-    const t=(d-per[i-1])/((per[i]-per[i-1])||1), a=ring[i-1], b=ring[i];
-    pts.push([a[0]+(b[0]-a[0])*t, y, a[1]+(b[1]-a[1])*t]); }
-  // hull2 runs from the leftmost point along the back first; reverse so the front is crossed left to right
-  if(frontLR) pts.splice(1, pts.length-1, ...pts.slice(1).reverse());
-  return {pts, perim:tot};
+// One level turn: the hull's own corners (no resampling, so sharp corners are wrapped exactly),
+// starting at the front-left corner and running across the front first when frontLR.
+function ringFromHull(H,y,frontLR=true){
+  // start: leftmost within 0.5 cm, then furthest forward. A vertical left edge gives several near-equal
+  // leftmost points; picking among them at random would make the start jump between front and back.
+  const minX=Math.min(...H.map(q=>q[0])); let s0=-1;
+  for(let i=0;i<H.length;i++) if(H[i][0]<=minX+0.5 && (s0<0 || H[i][1]>H[s0][1])) s0=i;
+  let poly=H.slice(s0).concat(H.slice(0,s0));
+  if(frontLR) poly=[poly[0], ...poly.slice(1).reverse()]; // hull2 is anticlockwise in (x,z): front-left heads to the back first
+  let perim=0; for(let i=0;i<poly.length;i++){ const a=poly[i], b=poly[(i+1)%poly.length]; perim+=Math.hypot(b[0]-a[0],b[1]-a[1]); }
+  return {poly, y, perim};
+}
+// Rings -> one spiral polyline. Height rises evenly with distance along each turn, so a turn ends one pitch
+// above where it started, next to the start of the next turn. starts[k] is the path index where turn k begins.
+function helixExact(rings,pitch){
+  const path=[], starts=[];
+  rings.forEach((r,k)=>{
+    starts.push(path.length); let run=0; const P=r.poly;
+    for(let i=0;i<P.length;i++){ if(i) run+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); path.push([P[i][0], r.y+pitch*run/r.perim, P[i][1]]); }
+    if(k===rings.length-1) path.push([P[0][0], r.y+pitch, P[0][1]]);
+  });
+  return {path, starts};
 }
 // Method C: like B, but where the body splits into separate points at the same height (the top V),
 // each point is spiralled on its own, with a return run of wire between them.
@@ -156,12 +167,12 @@ function wrapStarShape(S,pitch,res=48,frontLR=true,sideSeparate=true){
   const trunk=[], branches=[]; let splitY=null;
   for(let y=S.ymin+pitch/2;y<S.ymax;y+=pitch){
     const comps=sliceComponents(S,y,skip); if(!comps.length) continue;
-    if(comps.length===1 && splitY===null){ trunk.push(ringFromHull(comps[0],y,res,frontLR)); continue; }
+    if(comps.length===1 && splitY===null){ trunk.push(ringFromHull(comps[0],y,frontLR)); continue; }
     if(splitY===null) splitY=y;
-    comps.forEach((h,k)=>{ (branches[k]=branches[k]||[]).push(ringFromHull(h,y,res,frontLR)); });
+    comps.forEach((h,k)=>{ (branches[k]=branches[k]||[]).push(ringFromHull(h,y,frontLR)); });
   }
   const segs=[trunk,...branches].filter(s=>s.length);
-  const paths=segs.map(s=>helixFromLoops(s.map(l=>l.pts)));
+  const helices=segs.map(s=>helixExact(s,pitch)), paths=helices.map(h=>h.path);
   let length=0, loops=0;
   segs.forEach(s=>{ loops+=s.length; length+=s.reduce((a,l)=>a+Math.hypot(l.perim,pitch),0); });
   // joins: end of one segment to start of the next (the run back down between the top points)
@@ -170,9 +181,9 @@ function wrapStarShape(S,pitch,res=48,frontLR=true,sideSeparate=true){
   length+=joins;
   const names=['main body', ...branches.map((_,k)=>branches.length===2?(k?'right top point':'left top point'):'top point '+(k+1))];
   const segNames=[trunk,...branches].map((s,i)=>names[i]).filter((_,i)=>[trunk,...branches][i].length);
-  const parts=paths.map((p,i)=>({name:segNames[i], path:p, loops:segs[i].length, ppr:res, linked:i>0}));
+  const parts=paths.map((p,i)=>({name:segNames[i], path:p, starts:helices[i].starts, loops:segs[i].length, linked:i>0}));
   // side points first, each its own piece of wire
-  const sides=skip.map(n=>{const w=wrapPoint(S.points.find(p=>p.name===n),pitch,frontLR); return {name:n, path:w.path, loops:w.loops, ppr:4, length:w.length, linked:false};});
+  const sides=skip.map(n=>{const w=wrapPoint(S.points.find(p=>p.name===n),pitch,frontLR); return {name:n, path:w.path, starts:w.starts, loops:w.loops, length:w.length, linked:false};});
   sides.forEach(s=>{ length+=s.length; loops+=s.loops; });
   parts.unshift(...sides);
   return {path, parts, loops, length, joins, splitY, branches:branches.length, height:S.ymax-S.ymin, sideSeparate};

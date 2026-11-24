@@ -64,11 +64,13 @@ test("winding direction changes the path but not the wire length", () => {
   const rl = computeAll({ ...spec, pitch: 3, frontLR: false });
   near(lr.C.length, rl.C.length, lr.C.length * 0.005, "spiral length");
   near(lr.A_total, rl.A_total, lr.A_total * 0.005, "points + centre length");
-  // second point of the first full turn: on the front face (z > 0) moving right when frontLR
-  const turn = lr.C.parts.find((p) => p.name === "main body").path.slice(48 * 20, 48 * 21); // a full-size turn above the bottom tip
-  const firstFront = turn.find((p) => p[2] > 1);
-  const lastFront = turn.findLast((p) => p[2] > 1);
-  assert.ok(turn.indexOf(firstFront) < turn.indexOf(lastFront) && firstFront[0] < lastFront[0], "front crossed left to right");
+  // every turn starts at the front-left corner; with frontLR the wire then runs right along the front,
+  // otherwise it goes round the left edge to the back first
+  const turnOf = (r) => { const mb = r.C.parts.find((p) => p.name === "main body"); return mb.path.slice(mb.starts[20], mb.starts[21] + 1); };
+  const a = turnOf(lr), b = turnOf(rl);
+  assert.ok(a[0][2] > 0 && b[0][2] > 0, "turn starts on the front");
+  assert.ok(a[1][0] > a[0][0] + 1 && Math.abs(a[1][2] - a[0][2]) < 1, "front crossed left to right");
+  assert.ok(b[1][2] < b[0][2] - 1, "right-to-left option heads round the left edge first");
 });
 
 test("side points wound on their own get turns all along their flat underside", () => {
@@ -79,4 +81,26 @@ test("side points wound on their own get turns all along their flat underside", 
   const S = r.S, pt = S.points.find((p) => p.name === "right point");
   const lower = Math.atan2(Math.abs(pt.tip[1] - pt.base[0][1]), Math.hypot(pt.tip[0] - pt.base[0][0], pt.tip[2] - pt.base[0][2]));
   near(1.5 / Math.sin(lower), 21.9, 0.1, "level-turn spacing along the underside");
+});
+
+test("every spiral turn starts at the front-left corner, so turns never jump", () => {
+  for (const pitch of [1.5, 3]) {
+    const r = computeAll({ ...spec, pitch });
+    for (const part of r.C.parts.filter((p) => !/^(left|right) point$/.test(p.name))) {
+      for (let k = 1; k < part.loops; k++) {
+        const a = part.path[part.starts[k - 1]], b = part.path[part.starts[k]];
+        assert.ok(b[2] > 0, `${part.name} turn ${k + 1} starts on the front`);
+        assert.ok(Math.hypot(a[0] - b[0], a[2] - b[2]) < pitch * 2, `${part.name} turn ${k + 1} start moves smoothly`);
+      }
+    }
+  }
+});
+
+test("spiral turns follow the frame's own corners instead of evenly spaced samples", () => {
+  const r = computeAll({ ...spec, pitch: 3 });
+  const mb = r.C.parts.find((p) => p.name === "main body");
+  for (let k = 0; k + 1 < mb.loops; k++) {
+    const n = mb.starts[k + 1] - mb.starts[k];
+    assert.ok(n >= 3 && n <= 16, `turn ${k + 1} has ${n} corner points`);
+  }
 });

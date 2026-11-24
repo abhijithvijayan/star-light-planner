@@ -114,7 +114,7 @@ function update(){
   const ends=renderGuide(r,S,pitch,stripCm,(view==='A'?bA:bC).n1,buf);
   if(view!=='F'){
     const runs = view==='A'
-      ? [...r.A_points.map(p=>({name:p.name,path:p.path,ppr:4,loops:p.loops,linked:false})), {name:'centre',path:r.A_center.path,ppr:4,loops:r.A_center.loops,linked:false}]
+      ? [...r.A_points.map(p=>({name:p.name,path:p.path,starts:p.starts,loops:p.loops,linked:false})), {name:'centre',path:r.A_center.path,starts:r.A_center.starts,loops:r.A_center.loops,linked:false}]
       : r.C.parts;
     bulbs = buildAnim(buildSequence(runs, view==='A'?r.A_total:r.C.length), S, stripCm, ledColor, ends);
   } else { anim=null; }
@@ -124,7 +124,7 @@ function update(){
 }
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 // ---------- wrapping guide ----------
-// Each run is one continuous piece of wire: {name, path, ppr (path points per ring)}.
+// Each run is one continuous piece of wire: {name, path, starts (path index where each turn begins), loops}.
 // Joins: points where strip k ends, measured along the wire. Polyline lengths are scaled to the exact total.
 // A sequence is the wire in wrapping order: pieces, plus the linking runs between pieces that share one wire.
 // cum[] holds the length of wire used up to each vertex, scaled so the end equals the exact total.
@@ -133,7 +133,7 @@ function buildSequence(runs, exactTotal){
   runs.forEach((run,ri)=>{
     if(ri && run.linked){ const A=items.at(-1).path.at(-1), B=run.path[0];
       const d=Math.hypot(B[0]-A[0],B[1]-A[1],B[2]-A[2]);
-      if(d>0.5){ items.push({name: /top point/.test(run.name)&&/top point/.test(items.at(-1).name)?'return run':'link', path:[A,B], ppr:Infinity, loops:0, jump:true, cum:[poly,poly+d]}); poly+=d; } }
+      if(d>0.5){ items.push({name: /top point/.test(run.name)&&/top point/.test(items.at(-1).name)?'return run':'link', path:[A,B], starts:[0], loops:0, jump:true, cum:[poly,poly+d]}); poly+=d; } }
     const cum=[poly]; for(let i=1;i<run.path.length;i++){ const A=run.path[i-1],B=run.path[i]; poly+=Math.hypot(B[0]-A[0],B[1]-A[1],B[2]-A[2]); cum.push(poly); }
     items.push({...run, cum});
   });
@@ -151,10 +151,12 @@ function locate(seq, s){ // item, vertex index and position at wire length s
   const it=seq.items.at(-1), n=it.path.length-1; return {it, i:n, t:1, pos:it.path[n], dir:sub(it.path[n],it.path[n-1])};
 }
 const sub=(B,A)=>[B[0]-A[0],B[1]-A[1],B[2]-A[2]];
+// 1-based turn number for the segment ending at path index i
+function turnAt(it,i){ const st=it.starts; let lo=0,hi=st.length; while(lo<hi){const m=(lo+hi)>>1; if(st[m]<=i-1) lo=m+1; else hi=m;} return Math.max(1,Math.min(it.loops,lo)); }
 function stripEndsFor(seq, stripCm){
   const out=[];
   for(let n=1; n*stripCm<seq.total-1e-6; n++){ const L=locate(seq,n*stripCm);
-    out.push({n, s:n*stripCm, pos:L.pos, run:L.it, ring:L.it.jump?null:Math.floor((L.i-1)/L.it.ppr)+1, of:L.it.loops}); }
+    out.push({n, s:n*stripCm, pos:L.pos, run:L.it, ring:L.it.jump?null:turnAt(L.it,L.i), of:L.it.loops}); }
   return out;
 }
 const cm = x=>`<span class="num">${nf(x,x<100?1:0)} cm</span>`;
@@ -191,8 +193,8 @@ function guideSpiral(r,S,pitch,nBuy,buf,stripFt){
              : `One wire, wound in level turns from the bottom tip up to the two top tips. Heights are measured straight up from the bottom tip; the star is ${nf(H,0)} cm tall.`,
     steps};
 }
-function maxRing(r){ // longest single turn of the spiral, from consecutive ring lengths
-  let m=0; for(const part of r.C.parts){ const pp=part.ppr, P=part.path; for(let i=0;i+pp<P.length;i+=pp){ let s=0; for(let j=i+1;j<=i+pp;j++) s+=Math.hypot(P[j][0]-P[j-1][0],P[j][1]-P[j-1][1],P[j][2]-P[j-1][2]); m=Math.max(m,s);} } return m; }
+function maxRing(r){ // longest single turn of the spiral
+  let m=0; for(const part of r.C.parts){ const P=part.path, st=part.starts; for(let k=0;k<st.length;k++){ const end=st[k+1]??P.length-1; let s=0; for(let j=st[k]+1;j<=end;j++) s+=Math.hypot(P[j][0]-P[j-1][0],P[j][1]-P[j-1][1],P[j][2]-P[j-1][2]); m=Math.max(m,s);} } return m; }
 function guidePoints(r,S,pitch,nBuy,buf,stripFt){
   const up=r.A_points.find(p=>p.name!=='bottom point'), bot=r.A_points.find(p=>p.name==='bottom point');
   return { title:'Wrapping guide · Points + centre',
@@ -211,7 +213,7 @@ function renderGuide(r,S,pitch,stripCm,nBuy,buf){
   const g = view==='A' ? guidePoints(r,S,pitch,nBuy,buf,stripFt) : guideSpiral(r,S,pitch,nBuy,buf,stripFt);
   $('guideTitle').textContent=g.title; $('guideSub').textContent=g.sub;
   $('guideSteps').innerHTML=g.steps.map(s=>`<li>${s}</li>`).join('');
-  const runs = view==='A' ? [...r.A_points.map(p=>({name:p.name,path:p.path,ppr:4,loops:p.loops,linked:false})), {name:'centre',path:r.A_center.path,ppr:4,loops:r.A_center.loops,linked:false}] : r.C.parts;
+  const runs = view==='A' ? [...r.A_points.map(p=>({name:p.name,path:p.path,starts:p.starts,loops:p.loops,linked:false})), {name:'centre',path:r.A_center.path,starts:r.A_center.starts,loops:r.A_center.loops,linked:false}] : r.C.parts;
   const ends=stripEndsFor(buildSequence(runs, view==='A'?r.A_total:r.C.length), stripCm);
   const where=e=> e.ring==null ? (e.run.name==='return run'?'return run down to the notch':'link between pieces') : `${cap(e.run.name)} (piece ${e.run.piece}), turn ${e.ring} of ${e.of}`;
   const posCol = view==='A'
@@ -265,7 +267,7 @@ function buildAnim(seq, S, stripCm, ledColor, ends){
     endPts=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:9,map:ringTex,transparent:true,alphaTest:0.3,depthWrite:false,depthTest:false,fog:false})); endPts.renderOrder=5; group.add(endPts); }
   // piece numbers at each start, plus FRONT / BACK labels on the ground
   seq.items.filter(it=>!it.jump).forEach(it=>{ const s=textSprite(String(it.piece),'#ffb53d','#1b1400',9); const p=it.path[0]; s.position.set(p[0],p[1]-7,p[2]+(p[2]>=0?6:-6)); group.add(s); });
-  const fr=textSprite('FRONT','#e9e6f5','#141327',10); fr.position.set(0,S.ymin-22,S.depth/2+45); group.add(fr);
+  const fr=textSprite('FRONT','#e9e6f5','#141327',10); fr.position.set(0,S.ymin-12,S.depth/2+45); group.add(fr);
   // moving head: glow + arrow cone
   const head=new THREE.Group();
   // crisp marker for the end of the wire: white ball with a pink ring that always faces the camera
@@ -296,13 +298,13 @@ function statusText(L, s, done){
   if(done) return `Finished: <b>${nStrips}</b> strips laid in <b>${seq.items.filter(i=>!i.jump).length}</b> pieces. Press play to watch the order, or click a strip in the table below.`;
   const it=L.it, strip=Math.min(nStrips,Math.floor(s/stripCm)+1);
   if(it.jump) return `Strip <b>${strip}</b> of ${nStrips} · ${it.name==='return run'?'running the wire back down to the notch along the inside bar':'carrying the wire on to the next piece'}`;
-  const turn=Math.min(it.loops,Math.floor((L.i-1)/it.ppr)+1), [dx,dy,dz]=L.dir, z=L.pos[2];
+  const turn=turnAt(it,L.i), [dx,dy,dz]=L.dir, z=L.pos[2];
   let how;
   const lr=dx>0?'left → right':'right → left';
   if(Math.abs(dz)<0.5*Math.hypot(dx,dy,dz)) how = z>=0 ? `crossing the <span class="dirn">front, ${lr}</span>` : `crossing the <span class="dirn">back, ${lr}</span>`;
   else { // which edge: the side of this turn the wire is on, from the turn's own x-range
-    const k=Math.floor((L.i-1)/it.ppr)*it.ppr, ring=it.path.slice(k,k+it.ppr+1), xs=ring.map(q=>q[0]), mid=(Math.min(...xs)+Math.max(...xs))/2;
-    const edge = it.ppr>=8 ? (L.pos[0]>mid?'right edge':'left edge') : 'edge';
+    const t=turnAt(it,L.i)-1, ring=it.path.slice(it.starts[t], (it.starts[t+1]??it.path.length)+1), xs=ring.map(q=>q[0]), mid=(Math.min(...xs)+Math.max(...xs))/2;
+    const edge = /^(left|right) point$|^(upper|bottom)|centre/.test(it.name) ? 'edge' : (L.pos[0]>mid?'right edge':'left edge');
     how = `going round the <span class="dirn">${edge} to the ${dz<0?'back':'front'}</span>`; }
   const where = /^(left|right) point$|^(upper|bottom)/.test(it.name) || view==='A' ? '' : ` · ${nf(L.pos[1]-S.ymin,0)} cm above bottom tip`;
   return `Strip <b>${strip}</b> of ${nStrips} · Piece <b>${it.piece}</b>: ${it.name}, turn <b>${turn}</b> of ${it.loops}${where} · ${how}`;
