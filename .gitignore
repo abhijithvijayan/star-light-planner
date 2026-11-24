@@ -1,0 +1,17 @@
+# Environment variables
+.env
+.dev.vars
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Cloudflare Wrangler
+.wrangler/

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="3D model of a welded double-faced star frame with the LED wire wrap drawn at any spacing, plus strip count, cost and a step-by-step wrapping guide.">
+<meta name="theme-color" content="#f5f4f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#100f1c" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 4l13 34h36L70 60l11 36-31-22-31 22 11-36L1 38h36z' fill='%23ffb53d'/%3E%3C/svg%3E">
+<title>Star Light Wrap Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* Layout: stage (3D viewer) left, control rail right; results and geometry tables below. Night-sky stage, marigold LED accent. */
+:root{
+  --bg:#f5f4f8; --surface:#ffffff; --fg:#1c1a2b; --muted:#615d76; --line:#dcd9e6;
+  --accent:#c77800; --accent-soft:#fdf0db; --stage:#141327; --stage-fg:#e9e6f5;
+  --good:#1f7a4d; --chip:#ecebf3;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#100f1c; --surface:#1a1929; --fg:#ebe9f5; --muted:#a29fb8; --line:#2f2d45;
+  --accent:#ffb53d; --accent-soft:#3a2c12; --stage:#0b0a16; --stage-fg:#e9e6f5; --good:#5fd39a; --chip:#25233a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#100f1c; --surface:#1a1929; --fg:#ebe9f5; --muted:#a29fb8; --line:#2f2d45;
+  --accent:#ffb53d; --accent-soft:#3a2c12; --stage:#0b0a16; --stage-fg:#e9e6f5; --good:#5fd39a; --chip:#25233a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+header h1{font-family:var(--display);font-weight:700;font-size:clamp(1.6rem,3vw,2.3rem);margin:0;text-wrap:balance;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.top{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:900px){.top{grid-template-columns:minmax(0,1fr)}}
+.stage{position:relative;background:var(--stage);border-radius:14px;overflow:hidden;aspect-ratio:4/3.4;max-width:100%;min-height:340px}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud{position:absolute;left:12px;top:12px;right:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.hud .seg{pointer-events:auto}
+.hint{position:absolute;left:12px;bottom:10px;color:#a9a5c4;font-size:12px;pointer-events:none}
+.legend{position:absolute;right:12px;bottom:10px;color:var(--stage-fg);font:500 13px var(--mono);text-align:right;pointer-events:none}
+.seg{display:inline-flex;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:3px}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;border-radius:999px;color:#cfcbe6;font:500 13px var(--body)}
+.seg button[aria-pressed="true"]{background:#ffb53d;color:#1b1400}
+.seg button:focus-visible{outline:2px solid #ffb53d;outline-offset:2px}
+.rail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:16px}
+.rail h2,.panel h2{font-family:var(--display);font-weight:500;font-size:1.05rem;margin:0}
+.group{display:grid;gap:10px}
+.group > .label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.field{display:grid;grid-template-columns:1fr 92px;gap:8px;align-items:center}
+.field label{font-size:13.5px}
+.field input[type=number],.field input[type=text]{width:100%;box-sizing:border-box;font:500 14px var(--mono);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-variant-numeric:tabular-nums}
+.field input:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.pitchrow{display:grid;gap:4px}
+.pitchrow .top2{display:flex;justify-content:space-between;align-items:baseline}
+.pitchrow output{font:600 20px var(--mono);color:var(--accent)}
+.toggles{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:13.5px}
+.toggles label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.hr{height:1px;background:var(--line)}
+.results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:700px){.results{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px;min-width:0}
+.card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.card h3{font-family:var(--display);font-size:1.15rem;margin:0;font-weight:700}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:500}
+.tag.best{background:var(--accent-soft);color:var(--accent)}
+.big{font:500 clamp(1.8rem,4vw,2.4rem) var(--mono);letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.big small{font-size:.45em;color:var(--muted);margin-left:4px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.kv dd.strong{font-weight:600;color:var(--fg)}
+.buy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.buy div{background:var(--bg);border-radius:10px;padding:10px;min-width:0}
+.buy span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.buy b{font:600 1.25rem var(--mono);font-variant-numeric:tabular-nums}
+.buy div.hl{background:var(--accent-soft)} .buy div.hl b{color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px;min-width:0}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+th:first-child,td:first-child{text-align:left}
+td{font-family:var(--mono);font-variant-numeric:tabular-nums} td:first-child{font-family:var(--body)}
+tfoot td{font-weight:600}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+.notes{color:var(--muted);font-size:14px;max-width:80ch;display:grid;gap:8px}
+.notes p{margin:0}
+.notes b{color:var(--fg);font-weight:600}
+.err{color:#d64545;font-size:13.5px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.guide ol{margin:0;padding-left:1.4em;display:grid;gap:10px;max-width:80ch}
+.guide li{padding-left:4px}
+.guide li b{font-weight:600}
+.guide .num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--accent);font-weight:500}
+.guide .sub{color:var(--muted);font-size:14px;margin:0;max-width:80ch}
+.guide h3{font-family:var(--display);font-weight:500;font-size:1rem;margin:6px 0 0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff5d8f;vertical-align:middle;margin-right:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Star Light Wrap Planner</h1>
+    <p>3D model of the double-faced welded star frame, with the LED wire path drawn at your chosen pitch. Turn on the wrapping guide for step-by-step directions to hand to whoever does the wrapping. Change any number and the length, strip count and cost update live.</p>
+  </header>
+
+  <div class="top">
+    <div class="stage" id="stage">
+      <div class="hud">
+        <div class="seg" role="group" aria-label="Wrap method shown">
+          <button id="vC" aria-pressed="true">Full-body spiral</button>
+          <button id="vA" aria-pressed="false">Points + centre</button>
+          <button id="vF" aria-pressed="false">Frame only</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="hint">Drag to rotate · scroll or pinch to zoom · right-drag to pan</div>
+    </div>
+
+    <aside class="rail">
+      <div class="group">
+        <div class="pitchrow">
+          <div class="top2"><label for="pitch">Loop spacing (pitch)</label><output id="pitchOut">1.5 cm</output></div>
+          <input type="range" id="pitch" min="0.5" max="12" step="0.1" value="1.5">
+        </div>
+      </div>
+      <div class="group">
+        <div class="label">Look</div>
+        <div class="field"><label for="bulb">Bulb spacing on wire</label><select id="bulb" style="width:100%;font:500 14px var(--mono);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)"><option value="3" selected>3 in</option><option value="5">5 in</option><option value="7">7 in</option></select></div>
+        <div class="field"><label for="color">LED colour</label><input type="color" id="color" value="#ffc46b" style="width:100%;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--bg)"></div>
+        <div class="toggles">
+          <label><input type="checkbox" id="showFrame" checked> Frame</label>
+          <label><input type="checkbox" id="showWire" checked> Wire</label>
+          <label><input type="checkbox" id="showBulbs" checked> Bulbs</label>
+          <label><input type="checkbox" id="spin" checked> Auto-rotate</label>
+          <label><input type="checkbox" id="showGuide" checked> Wrapping guide</label>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div class="group">
+        <div class="label">Buying</div>
+        <div class="field"><label for="stripFt">Strip length (ft)</label><input type="number" id="stripFt" min="1" step="0.5" value="14"></div>
+        <div class="field"><label for="buffer">Wastage / joins (%)</label><input type="number" id="buffer" min="0" step="1" value="10"></div>
+        <div class="field"><label for="price">Price per strip (₹)</label><input type="number" id="price" min="0" step="1" value="79"></div>
+        <div style="font-size:12px;color:var(--muted)">₹79 is the quoted price per 14 ft strip.</div>
+      </div>
+      <div class="hr"></div>
+      <div class="group">
+        <div class="label">Frame geometry (cm)</div>
+        <div class="field"><label for="upperEdge">Upper point edge</label><input type="number" id="upperEdge" step="0.5" value="80"></div>
+        <div class="field"><label for="bottomEdge">Bottom point edge</label><input type="number" id="bottomEdge" step="0.5" value="112"></div>
+        <div class="field"><label for="depth">Centre depth (strut)</label><input type="number" id="depth" step="0.5" value="27"></div>
+        <div class="field"><label for="sideEdge">Inner edge, 4 sides</label><input type="number" id="sideEdge" step="0.5" value="53"></div>
+        <div class="field"><label for="bottomInner">Inner edge, bottom</label><input type="number" id="bottomInner" step="0.5" value="58"></div>
+        <div class="err" id="err" hidden></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="results">
+    <article class="card" id="cardC">
+      <div class="head"><h3>Full-body spiral</h3><span class="tag" id="tagC"></span></div>
+      <div class="big" id="lenC"></div>
+      <dl class="kv" id="kvC"></dl>
+      <div class="buy" id="buyC"></div>
+    </article>
+    <article class="card" id="cardA">
+      <div class="head"><h3>Points + centre</h3><span class="tag" id="tagA"></span></div>
+      <div class="big" id="lenA"></div>
+      <dl class="kv" id="kvA"></dl>
+      <div class="buy" id="buyA"></div>
+    </article>
+  </section>
+
+  <section class="panel guide" id="guide">
+    <h2 id="guideTitle">Wrapping guide</h2>
+    <p class="sub" id="guideSub"></p>
+    <ol id="guideSteps"></ol>
+    <h3>Where each strip runs out</h3>
+    <p class="sub"><span class="dot"></span>Pink dots in the 3D view mark these points. Positions are from the model; the real wire will drift a little, so check against the marks as you go.</p>
+    <div class="tbl"><table id="tblJoins"></table></div>
+  </section>
+
+  <div class="two">
+    <section class="panel">
+      <h2>Points + centre breakdown</h2>
+      <div class="tbl"><table id="tblA"></table></div>
+    </section>
+    <section class="panel">
+      <h2>Vertex coordinates (cm)</h2>
+      <div class="tbl"><table id="tblV"></table></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>How the numbers are worked out</h2>
+    <div class="notes">
+      <p><b>Axes.</b> Origin at the centre of the star, x to the right, y up, z towards the viewer. Front face at z = +depth/2, back face at z = −depth/2, all five tips at z = 0 where the faces are welded.</p>
+      <p><b>Inner pentagon.</b> Four 53 cm sides and one 58 cm bottom side don't fix a pentagon on their own (it can still flex). The model takes the version whose five corners lie on one circle, which is mirror-symmetric and the closest to a regular pentagon. Every edge length you gave is matched exactly.</p>
+      <p><b>Points.</b> Each tip sits on the perpendicular through the middle of its inner edge, at the distance that makes all four bars (front-left, front-right, back-left, back-right) exactly 80 cm, or 112 cm for the bottom point. Seen from the side, each point is the 80 / 80 / 27 (or 112 / 112 / 27) triangle in the spec.</p>
+      <p><b>Points + centre.</b> Each point is a four-sided pyramid with a base of inner-edge × depth. The wire goes round it in rings that get smaller towards the tip, one ring per pitch measured along the 80 or 112 cm bar. The centre is then wrapped as a pentagonal box, front face, side, back face, side, one ring per pitch of height.</p>
+      <p><b>Full-body spiral.</b> One wire spiralling up a vertical axis from the bottom tip, one ring per pitch of height. Each ring is the taut loop around the frame at that height, which follows the side notches because they open sideways. At the top corner of the inner pentagon the star splits into the two top points, so the wire spirals up one top point, runs back down to the notch, and spirals up the other. That keeps the V between the top points open. The return run is included in the total.</p>
+      <p><b>Why not one loop round both top points.</b> Above the notch, a single loop round both top points crosses up to 125 cm of empty air near the tips and fills the V in, so the top reads as a flat-topped block. It also needs about 11% more wire.</p>
+      <p><b>Ring length.</b> Every ring includes the small extra length from climbing one pitch (√(perimeter² + pitch²)). Wire slack, sag, the lead to the plug and any return run are not included; the wastage % is there for that.</p>
+    </div>
+  </section>
+</div>
+
+<script src="calc.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
