@@ -18,16 +18,20 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.target.set(0,-20,0);
 controls.autoRotate = true; controls.autoRotateSpeed = 0.8;
 const group = new THREE.Group(); scene.add(group);
+// fade the far side of the star so back-face wire doesn't show through the front as blotchy patches
+scene.fog = new THREE.Fog(0x0d0c1c, 1, 2);
+function updateFog(){ const d=camera.position.distanceTo(controls.target); scene.fog.near=d-10; scene.fog.far=d+70; }
 
 // soft round sprite for bulbs
 const sprite = (()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');
-  const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.25,'rgba(255,255,255,.85)');gr.addColorStop(1,'rgba(255,255,255,0)');
+  const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.45,'rgba(255,255,255,1)');gr.addColorStop(.6,'rgba(255,255,255,.25)');gr.addColorStop(.75,'rgba(255,255,255,0)');
   g.fillStyle=gr;g.fillRect(0,0,64,64);const t=new THREE.CanvasTexture(c);return t;})();
 
+const ringTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.fillStyle='#ff5d8f';g.beginPath();g.arc(32,32,28,0,Math.PI*2);g.fill();g.fillStyle='#ffffff';g.beginPath();g.arc(32,32,12,0,Math.PI*2);g.fill();return new THREE.CanvasTexture(c);})();
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe(stage); resize();
 let anim=null, lastT=performance.now();
-renderer.setAnimationLoop((t)=>{const dt=Math.min(0.1,(t-lastT)/1000); lastT=t; tickAnim(dt); controls.update(); renderer.render(scene,camera);});
+renderer.setAnimationLoop((t)=>{const dt=Math.min(0.1,(t-lastT)/1000); lastT=t; tickAnim(dt); controls.update(); updateFog(); renderer.render(scene,camera);});
 
 function clearGroup(){while(group.children.length){const o=group.children.pop();o.geometry?.dispose();o.material?.dispose();}}
 function samplePath(path, step){
@@ -116,7 +120,7 @@ function update(){
   } else { anim=null; }
   $('playbar').hidden = view==='F';
   const L=view==='A'?r.A_total:view==='C'?r.C.length:S.barTotal;
-  $('legend').innerHTML = view==='F' ? `Frame bars ${nf(L/100,2)} m` : `${nf(L/100,1)} m wire${bulbs?` · ~${nf(bulbs,0)} bulbs`:''}`;
+  $('legend').innerHTML = view==='F' ? `Frame bars ${nf(L/100,2)} m` : `${nf(L/100,1)} m wire${bulbs?` · ~${nf(bulbs,0)} bulbs`:''}${anim&&anim.ends.length?'<br><span style="color:#ff8fb1">● pink dots = where strips run out</span>':''}`;
 }
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 // ---------- wrapping guide ----------
@@ -227,7 +231,7 @@ function textSprite(text, bg, fg='#1b1400', h=11){
   c.width=w; c.height=fs+24; g.font=`600 ${fs}px IBM Plex Sans, system-ui, sans-serif`;
   g.fillStyle=bg; g.beginPath(); g.roundRect(0,0,w,c.height,c.height/2); g.fill();
   g.fillStyle=fg; g.textBaseline='middle'; g.fillText(text,18,c.height/2+2);
-  const m=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true});
+  const m=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true,fog:false});
   const s=new THREE.Sprite(m); s.scale.set(h*w/c.height,h,1); s.renderOrder=10; return s;
 }
 function buildAnim(seq, S, stripCm, ledColor, ends){
@@ -252,23 +256,23 @@ function buildAnim(seq, S, stripCm, ledColor, ends){
         while(next<=c1){ const t=(next-c0)/((c1-c0)||1), A=it.path[i-1], B=it.path[i];
           pos.push(A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t, A[2]+(B[2]-A[2])*t); bulbCum.push(next); next+=step; } } }
     const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-    bulbPts=new THREE.Points(g,new THREE.PointsMaterial({color:ledColor,size:Math.min(9,Math.max(2.5,step*0.55)),map:sprite,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    bulbPts=new THREE.Points(g,new THREE.PointsMaterial({color:ledColor,size:Math.min(6,Math.max(2,step*0.4)),map:sprite,transparent:true,alphaTest:0.2,depthWrite:false}));
     group.add(bulbPts);
   }
   // strip ends
   let endPts=null;
   if(ends.length){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(ends.flatMap(e=>e.pos),3));
-    endPts=new THREE.Points(g,new THREE.PointsMaterial({color:0xff5d8f,size:12,map:sprite,transparent:true,depthWrite:false,depthTest:false})); endPts.renderOrder=5; group.add(endPts); }
+    endPts=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:9,map:ringTex,transparent:true,alphaTest:0.3,depthWrite:false,depthTest:false,fog:false})); endPts.renderOrder=5; group.add(endPts); }
   // piece numbers at each start, plus FRONT / BACK labels on the ground
   seq.items.filter(it=>!it.jump).forEach(it=>{ const s=textSprite(String(it.piece),'#ffb53d','#1b1400',9); const p=it.path[0]; s.position.set(p[0],p[1]-7,p[2]+(p[2]>=0?6:-6)); group.add(s); });
   const fr=textSprite('FRONT','#e9e6f5','#141327',10); fr.position.set(0,S.ymin-22,S.depth/2+45); group.add(fr);
   // moving head: glow + arrow cone
   const head=new THREE.Group();
   // crisp marker for the end of the wire: white ball with a pink ring that always faces the camera
-  const ball=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,12),new THREE.MeshBasicMaterial({color:0xffffff,depthTest:false})); ball.renderOrder=12; head.add(ball);
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,12),new THREE.MeshBasicMaterial({color:0xffffff,depthTest:false,fog:false})); ball.renderOrder=12; head.add(ball);
   const ringC=document.createElement('canvas'); ringC.width=ringC.height=64; const rg=ringC.getContext('2d'); rg.strokeStyle='#ff5d8f'; rg.lineWidth=6; rg.beginPath(); rg.arc(32,32,26,0,Math.PI*2); rg.stroke();
-  const ring=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(ringC),depthTest:false,transparent:true})); ring.scale.set(11,11,1); ring.renderOrder=11; head.add(ring);
-  const cone=new THREE.Mesh(new THREE.ConeGeometry(3.2,10,16),new THREE.MeshBasicMaterial({color:0xff5d8f,depthTest:false})); cone.renderOrder=12; head.add(cone);
+  const ring=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(ringC),depthTest:false,transparent:true,fog:false})); ring.scale.set(11,11,1); ring.renderOrder=11; head.add(ring);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(3.2,10,16),new THREE.MeshBasicMaterial({color:0xff5d8f,depthTest:false,fog:false})); cone.renderOrder=12; head.add(cone);
   group.add(head);
   anim={seq, lines, ghosts, bulbPts, bulbCum, endPts, ends, head, cone, stripCm, S, s:prevFrac*seq.total, playing:!!wasPlaying};
   applyProgress();
