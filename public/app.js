@@ -264,7 +264,10 @@ function buildAnim(seq, S, stripCm, ledColor, ends){
   const fr=textSprite('FRONT','#e9e6f5','#141327',10); fr.position.set(0,S.ymin-22,S.depth/2+45); group.add(fr);
   // moving head: glow + arrow cone
   const head=new THREE.Group();
-  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:sprite,color:0xffffff,transparent:true,depthTest:false,blending:THREE.AdditiveBlending})); glow.scale.set(16,16,1); glow.renderOrder=11; head.add(glow);
+  // crisp marker for the end of the wire: white ball with a pink ring that always faces the camera
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,12),new THREE.MeshBasicMaterial({color:0xffffff,depthTest:false})); ball.renderOrder=12; head.add(ball);
+  const ringC=document.createElement('canvas'); ringC.width=ringC.height=64; const rg=ringC.getContext('2d'); rg.strokeStyle='#ff5d8f'; rg.lineWidth=6; rg.beginPath(); rg.arc(32,32,26,0,Math.PI*2); rg.stroke();
+  const ring=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(ringC),depthTest:false,transparent:true})); ring.scale.set(11,11,1); ring.renderOrder=11; head.add(ring);
   const cone=new THREE.Mesh(new THREE.ConeGeometry(3.2,10,16),new THREE.MeshBasicMaterial({color:0xff5d8f,depthTest:false})); cone.renderOrder=12; head.add(cone);
   group.add(head);
   anim={seq, lines, ghosts, bulbPts, bulbCum, endPts, ends, head, cone, stripCm, S, s:prevFrac*seq.total, playing:!!wasPlaying};
