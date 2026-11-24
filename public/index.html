@@ -96,6 +96,20 @@ tfoot td{font-weight:600}
 .notes b{color:var(--fg);font-weight:600}
 .err{color:#d64545;font-size:13.5px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.col{display:grid;gap:10px;min-width:0}
+.playbar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;gap:8px}
+.pbrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pbrow input[type=range]{flex:1 1 160px;min-width:120px}
+.pbrow select{font:500 13px var(--mono);padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.pbtn{font:500 13.5px var(--body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.pbtn:hover{border-color:var(--accent)}
+.pbtn.primary{background:var(--accent);border-color:var(--accent);color:#1b1400;font-weight:600}
+.pbtn:focus-visible,.pbrow select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{font-size:14px;min-height:1.5em;font-variant-numeric:tabular-nums}
+.status b{font-weight:600}
+.status .dirn{color:var(--accent);font-weight:600}
+#tblJoins tbody tr{cursor:pointer}
+#tblJoins tbody tr:hover td{background:var(--accent-soft)}
 .guide ol{margin:0;padding-left:1.4em;display:grid;gap:10px;max-width:80ch}
 .guide li{padding-left:4px}
 .guide li b{font-weight:600}
@@ -113,6 +127,7 @@ tfoot td{font-weight:600}
   </header>
 
   <div class="top">
+    <div class="col">
     <div class="stage" id="stage">
       <div class="hud">
         <div class="seg" role="group" aria-label="Wrap method shown">
@@ -123,6 +138,18 @@ tfoot td{font-weight:600}
       </div>
       <div class="legend" id="legend"></div>
       <div class="hint">Drag to rotate · scroll or pinch to zoom · right-drag to pan</div>
+    </div>
+    <div class="playbar" id="playbar">
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="pbrow">
+        <button class="pbtn primary" id="play" type="button">▶ Play wrapping</button>
+        <button class="pbtn" id="prevStrip" type="button" title="Back one strip">⏮ Strip</button>
+        <button class="pbtn" id="nextStrip" type="button" title="Forward one strip">Strip ⏭</button>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="1000" aria-label="Wrapping progress">
+        <select id="speed" aria-label="Playback speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+        <button class="pbtn" id="faceFront" type="button">Face front</button>
+      </div>
+    </div>
     </div>
 
     <aside class="rail">
@@ -141,8 +168,18 @@ tfoot td{font-weight:600}
           <label><input type="checkbox" id="showWire" checked> Wire</label>
           <label><input type="checkbox" id="showBulbs" checked> Bulbs</label>
           <label><input type="checkbox" id="spin" checked> Auto-rotate</label>
+          <label><input type="checkbox" id="stripColors" checked> Colour by strip</label>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div class="group">
+        <div class="label">Wrapping</div>
+        <div class="field"><label for="dir">Across the front</label><select id="dir" style="width:100%;font:500 14px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)"><option value="lr" selected>Left → right</option><option value="rl">Right → left</option></select></div>
+        <div class="toggles">
+          <label><input type="checkbox" id="sideSeparate" checked> Wind side points on their own</label>
           <label><input type="checkbox" id="showGuide" checked> Wrapping guide</label>
         </div>
+        <div style="font-size:12px;color:var(--muted)">The left and right points have an almost flat underside. Level turns only cross it every 20 cm or so, so by default they are wound along their own length.</div>
       </div>
       <div class="hr"></div>
       <div class="group">
@@ -182,10 +219,11 @@ tfoot td{font-weight:600}
 
   <section class="panel guide" id="guide">
     <h2 id="guideTitle">Wrapping guide</h2>
+    <p class="sub">Press <b>Play wrapping</b> under the 3D view to watch the wire go on in this order. The numbered tags in 3D mark where each piece starts.</p>
     <p class="sub" id="guideSub"></p>
     <ol id="guideSteps"></ol>
     <h3>Where each strip runs out</h3>
-    <p class="sub"><span class="dot"></span>Pink dots in the 3D view mark these points. Positions are from the model; the real wire will drift a little, so check against the marks as you go.</p>
+    <p class="sub"><span class="dot"></span>Pink dots in the 3D view mark these points. Click a row to jump the animation there. Positions are from the model; the real wire will drift a little, so check against the marks as you go.</p>
     <div class="tbl"><table id="tblJoins"></table></div>
   </section>
 

@@ -40,6 +40,7 @@
 - **3D preview** - Rotate and zoom the frame with the wire and bulbs drawn at the chosen spacing
 - **Two wrap methods** - A full-body spiral that keeps both top points, or each point wound on its own plus the centre
 - **Live numbers** - Wire length, turns, strips with and without a wastage buffer, bulb count and cost
+- **Wrapping animation** - Play the wrap in order: numbered pieces, a moving arrow for the winding direction, strips in alternating colours, and a status line with strip, piece, turn and which face the wire is crossing
 - **Wrapping guide** - Step-by-step directions for whoever does the wrapping, with where each strip runs out, shown as a table and as markers in 3D
 - **Editable frame** - Point bar lengths, centre depth and inner edge lengths can all be changed
 - **No backend** - Static page, no build step, light and dark themes
@@ -50,7 +51,8 @@
 2. Enter the frame measurements if they differ from the defaults.
 3. Drag the loop spacing slider and pick the bulb spacing (3, 5 or 7 inch) to see how dense the wrap looks.
 4. Enter the price per strip and the wastage buffer.
-5. Turn on the wrapping guide and hand the steps and the strip table to whoever is wrapping.
+5. Press **Play wrapping** under the 3D view to show the team the order and direction, and step through it a strip at a time.
+6. Hand the wrapping guide and the strip table to whoever is wrapping.
 
 ## How It Works
 
@@ -68,13 +70,16 @@ Axes: x right, y up, z towards the viewer. The front face is at z = +depth/2, th
 
 **Full-body spiral.** Level turns from the bottom tip upwards, one per pitch of height. Each turn is the taut loop around the frame at that height. Above the top corner of the inner pentagon the frame splits into two points, so the wire winds one top point, runs back down to the notch and winds the other. A single loop around both would cross up to 125 cm of empty air and fill in the V.
 
+The left and right points have an underside bar only 3.9° off horizontal, so level turns would cross it only every 22 cm at a 1.5 cm pitch. By default they are wound first, each along its own length like the points method, and the spiral goes round the centre only at their height. This can be switched off.
+
 **Points + centre.** Each point is a four-sided pyramid wound from its base to its tip, one turn per pitch along the bar. The centre is wound as a pentagonal box.
 
 Each turn is counted as √(perimeter² + pitch²). With the defaults at 1.5 cm pitch:
 
 | Method | Wire | 14 ft strips | With 10% |
 |--------|------|--------------|----------|
-| Full-body spiral | 265.5 m | 63 | 69 |
+| Full-body spiral, side points wound on their own | 306.9 m | 72 | 80 |
+| Full-body spiral, all level turns | 265.5 m | 63 | 69 |
 | Points + centre | 329.9 m | 78 | 86 |
 
 ## Assumptions

@@ -41,18 +41,42 @@ test("star is about 234 cm tall and 215 cm wide", () => {
 test("wire lengths at 1.5 cm pitch", () => {
   const r = computeAll({ ...spec, pitch: 1.5 });
   near(r.A_total, 32988, 1, "points + centre");
-  near(r.C.length, 26552, 1, "full-body spiral");
+  near(r.C.length, 30688, 1, "full-body spiral, side points wound on their own");
+  near(computeAll({ ...spec, pitch: 1.5, sideSeparate: false }).C.length, 26552, 1, "full-body spiral, all level turns");
 });
 
 test("full-body spiral keeps the two top points separate", () => {
   const r = computeAll({ ...spec, pitch: 1.5 });
   assert.equal(r.C.branches, 2);
-  assert.deepEqual(Array.from(r.C.parts, (p) => p.name), ["main body", "left top point", "right top point"]);
+  assert.deepEqual(Array.from(r.C.parts, (p) => p.name), ["left point", "right point", "main body", "left top point", "right top point"]);
   near(r.C.splitY, 45.95, 1.5, "split height at the top corner of the pentagon");
-  assert.ok(r.C.length < r.B.length, "spiral that bridges the top V uses more wire");
+  const levelOnly = computeAll({ ...spec, pitch: 1.5, sideSeparate: false });
+  assert.ok(levelOnly.C.length < levelOnly.B.length, "spiral that bridges the top V uses more wire");
 });
 
 test("a point edge too short for the base is reported, not drawn", () => {
   const S = buildStar({ ...spec, upperEdge: 20 });
   assert.match(S.error, /too short/);
+});
+
+test("winding direction changes the path but not the wire length", () => {
+  const lr = computeAll({ ...spec, pitch: 3 });
+  const rl = computeAll({ ...spec, pitch: 3, frontLR: false });
+  near(lr.C.length, rl.C.length, lr.C.length * 0.005, "spiral length");
+  near(lr.A_total, rl.A_total, lr.A_total * 0.005, "points + centre length");
+  // second point of the first full turn: on the front face (z > 0) moving right when frontLR
+  const turn = lr.C.parts.find((p) => p.name === "main body").path.slice(48 * 20, 48 * 21); // a full-size turn above the bottom tip
+  const firstFront = turn.find((p) => p[2] > 1);
+  const lastFront = turn.findLast((p) => p[2] > 1);
+  assert.ok(turn.indexOf(firstFront) < turn.indexOf(lastFront) && firstFront[0] < lastFront[0], "front crossed left to right");
+});
+
+test("side points wound on their own get turns all along their flat underside", () => {
+  const r = computeAll({ ...spec, pitch: 1.5 });
+  const side = r.C.parts.find((p) => p.name === "right point");
+  assert.equal(side.loops, Math.floor(80 / 1.5) + 1); // first turn at the base, then one per 1.5 cm
+  // level turns would cross the 3.9 degree underside bar only every ~22 cm; wound along the point it is one turn per 1.5 cm of bar
+  const S = r.S, pt = S.points.find((p) => p.name === "right point");
+  const lower = Math.atan2(Math.abs(pt.tip[1] - pt.base[0][1]), Math.hypot(pt.tip[0] - pt.base[0][0], pt.tip[2] - pt.base[0][2]));
+  near(1.5 / Math.sin(lower), 21.9, 0.1, "level-turn spacing along the underside");
 });
